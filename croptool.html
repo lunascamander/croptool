@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image Cropper Tool</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    .cropper-container-wrapper {
+      width: 400px;
+      height: 300px;
+      margin-top: 20px;
+      position: relative;
+    }
+    #image {
+      max-width: 100%;
+      display: none;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    .controls button {
+      margin-right: 10px;
+      padding: 6px 12px;
+      font-size: 14px;
+    }
+    canvas {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      display: block;
+    }
+    #dropArea {
+      border: 2px dashed #aaa;
+      padding: 20px;
+      margin-top: 10px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    #dropArea.hover {
+      border-color: green;
+      background-color: #f0fff0;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Upload and Crop Image</h2>
+
+  <input type="file" id="fileInput" accept="image/*" style="display:none" />
+
+  <div id="dropArea">
+    Drag & Drop image here or click to select
+  </div>
+
+  <div class="cropper-container-wrapper">
+    <img id="image" alt="Selected Image" />
+  </div>
+
+  <div class="controls">
+    <button id="zoomIn" disabled>Zoom In</button>
+    <button id="zoomOut" disabled>Zoom Out</button>
+    <button id="getCropped" disabled>Get Cropped Image</button>
+    <button id="downloadCropped" disabled>Download Cropped Image</button>
+  </div>
+
+  <canvas id="resultCanvas"></canvas>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropArea = document.getElementById('dropArea');
+    const image = document.getElementById('image');
+    const canvas = document.getElementById('resultCanvas');
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    const getCroppedBtn = document.getElementById('getCropped');
+    const downloadBtn = document.getElementById('downloadCropped');
+
+    let cropper;
+
+    // Handle file input change (manual selection)
+    fileInput.addEventListener('change', function (event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      loadImage(file);
+    });
+
+    // Load image and initialize cropper
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        image.src = e.target.result;
+        image.style.display = 'block';
+
+        if (cropper) {
+          cropper.destroy();
+        }
+
+        image.onload = () => {
+          cropper = new Cropper(image, {
+            viewMode: 1,
+            aspectRatio: 160 / 151,
+            autoCropArea: 1,
+            dragMode: 'move',
+            cropBoxResizable: false,
+            cropBoxMovable: false,
+            ready() {
+              const box = cropper.getCropBoxData();
+              cropper.setCropBoxData({
+                left: box.left,
+                top: box.top,
+                width: 160,
+                height: 151
+              });
+            }
+          });
+
+          // Enable buttons
+          zoomInBtn.disabled = false;
+          zoomOutBtn.disabled = false;
+          getCroppedBtn.disabled = false;
+          downloadBtn.disabled = true; // disabled until crop done
+          canvas.width = 0; // clear canvas
+          canvas.height = 0;
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Drag & Drop handlers
+    dropArea.addEventListener('click', () => fileInput.click());
+
+    dropArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropArea.classList.add('hover');
+    });
+
+    dropArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropArea.classList.remove('hover');
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropArea.classList.remove('hover');
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length) {
+        fileInput.files = files;
+        fileInput.dispatchEvent(new Event('change'));
+      }
+    });
+
+    // Zoom buttons
+    zoomInBtn.addEventListener('click', () => cropper?.zoom(0.1));
+    zoomOutBtn.addEventListener('click', () => cropper?.zoom(-0.1));
+
+    // Get cropped image and draw on canvas
+    getCroppedBtn.addEventListener('click', () => {
+      if (!cropper) return;
+      const croppedCanvas = cropper.getCroppedCanvas({ width: 160, height: 151 });
+      canvas.width = 160;
+      canvas.height = 151;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(croppedCanvas, 0, 0);
+
+      // Enable download button and store data URL
+      downloadBtn.disabled = false;
+      downloadBtn.dataset.url = croppedCanvas.toDataURL('image/png');
+    });
+
+    // Download cropped image
+    downloadBtn.addEventListener('click', () => {
+      const url = downloadBtn.dataset.url;
+      if (!url) return;
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cropped-image.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  </script>
+
+</body>
+</html>
