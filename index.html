@@ -22,7 +22,7 @@
     .controls {
       margin-top: 10px;
     }
-    .controls button {
+    .controls button, .controls select {
       margin-right: 10px;
       padding: 6px 12px;
       font-size: 14px;
@@ -61,6 +61,11 @@
   </div>
 
   <div class="controls">
+    <label for="cropSize">Select Crop Size:</label>
+    <select id="cropSize">
+      <option value="160x151">160 × 151</option>
+      <option value="202x142">202 × 142</option>
+    </select>
     <button id="zoomIn" disabled>Zoom In</button>
     <button id="zoomOut" disabled>Zoom Out</button>
     <button id="getCropped" disabled>Get Cropped Image</button>
@@ -79,14 +84,15 @@
     const zoomOutBtn = document.getElementById('zoomOut');
     const getCroppedBtn = document.getElementById('getCropped');
     const downloadBtn = document.getElementById('downloadCropped');
+    const cropSizeSelect = document.getElementById('cropSize');
 
     let cropper;
+    let currentCropSize = { width: 160, height: 151 };
 
     // Handle file input change (manual selection)
     fileInput.addEventListener('change', function (event) {
       const file = event.target.files[0];
       if (!file) return;
-
       loadImage(file);
     });
 
@@ -104,7 +110,7 @@
         image.onload = () => {
           cropper = new Cropper(image, {
             viewMode: 1,
-            aspectRatio: 160 / 151,
+            aspectRatio: currentCropSize.width / currentCropSize.height,
             autoCropArea: 1,
             dragMode: 'move',
             cropBoxResizable: false,
@@ -114,8 +120,8 @@
               cropper.setCropBoxData({
                 left: box.left,
                 top: box.top,
-                width: 160,
-                height: 151
+                width: currentCropSize.width,
+                height: currentCropSize.height
               });
             }
           });
@@ -124,13 +130,30 @@
           zoomInBtn.disabled = false;
           zoomOutBtn.disabled = false;
           getCroppedBtn.disabled = false;
-          downloadBtn.disabled = true; // disabled until crop done
-          canvas.width = 0; // clear canvas
+          downloadBtn.disabled = true;
+          canvas.width = 0;
           canvas.height = 0;
         };
       };
       reader.readAsDataURL(file);
     }
+
+    // Handle crop size changes
+    cropSizeSelect.addEventListener('change', () => {
+      const [w, h] = cropSizeSelect.value.split('x').map(Number);
+      currentCropSize = { width: w, height: h };
+
+      if (cropper) {
+        cropper.setAspectRatio(w / h);
+        const box = cropper.getCropBoxData();
+        cropper.setCropBoxData({
+          left: box.left,
+          top: box.top,
+          width: w,
+          height: h
+        });
+      }
+    });
 
     // Drag & Drop handlers
     dropArea.addEventListener('click', () => fileInput.click());
@@ -163,9 +186,12 @@
     // Get cropped image and draw on canvas
     getCroppedBtn.addEventListener('click', () => {
       if (!cropper) return;
-      const croppedCanvas = cropper.getCroppedCanvas({ width: 160, height: 151 });
-      canvas.width = 160;
-      canvas.height = 151;
+      const croppedCanvas = cropper.getCroppedCanvas({
+        width: currentCropSize.width,
+        height: currentCropSize.height
+      });
+      canvas.width = currentCropSize.width;
+      canvas.height = currentCropSize.height;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(croppedCanvas, 0, 0);
@@ -179,7 +205,6 @@
     downloadBtn.addEventListener('click', () => {
       const url = downloadBtn.dataset.url;
       if (!url) return;
-
       const a = document.createElement('a');
       a.href = url;
       a.download = 'cropped-image.png';
